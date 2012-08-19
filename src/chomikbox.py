@@ -23,6 +23,7 @@ import traceback
 import model
 ##################
 from soap import SOAP
+from cookielib import CookieJar
                                  
 #############################
 glob_timeout = 240
@@ -115,9 +116,14 @@ class Chomik(object):
         self.cur_fold      = []
         self.user          = ''
         self.password      = ''
+        self.last_login    = 0
 
 
-    def send(self, content):
+    def send(self, content, l_ip = "box.chomikuj.pl", l_port = 80):
+        if l_ip != None:
+            login_ip = l_ip
+        if l_port != None:
+            login_port = l_port
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(glob_timeout)
         sock.connect( (login_ip, login_port) )
@@ -146,6 +152,9 @@ class Chomik(object):
             return False
 
     def relogin(self):
+        if self.last_login + 300 > time.time():
+            return True
+        self.last_login = time.time()
         password = hashlib.md5(self.password).hexdigest()
         xml_dict = [('ROOT',[('name' , self.user), ('passHash', password), ('ver' , '4'), ('client',[('name','chomikbox'),('version','2.0.4.3') ]) ])]
         xml_content = self.soap.soap_dict_to_xml(xml_dict, "Auth").strip()
@@ -177,7 +186,34 @@ class Chomik(object):
             #self.view.print_( resp )
             return False
         else:
+            self.log_www()
             return True
+    
+    def log_www(self):
+        cj = CookieJar()
+        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+        opener.addheaders.append(('User-Agent','Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)'))
+        opener.addheaders.append(('X-Requested-With', 'XMLHttpRequest'))
+        opener.addheaders.append(('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8'))
+        resp = opener.open("http://www.chomikuj.pl")
+        cont = resp.read()
+        resp.close()
+        req_token = re.findall("""<form action="/action/Login/TopBarLogin" method="post"><input name="__RequestVerificationToken".*?value="([^"]*)" />""", cont)[0]
+        #################
+        values = { "ReturnUrl" : "", "Login": self.user, "rememberLogin" : "true" , "Password" : self.password , "__RequestVerificationToken" : req_token }
+        data = urllib.urlencode(values)
+        resp = opener.open("http://chomikuj.pl/action/Login/TopBarLogin", data)
+        cont = resp.read()
+        resp.close()
+        #print cont
+        ########
+        values = { "chomikId" : self.chomik_id, "folderId": 0, "__RequestVerificationToken" : req_token }
+        data = urllib.urlencode(values)
+        resp = opener.open("http://chomikuj.pl/action/chomikbox/DownloadFolderChomikBox", data)
+        cont = resp.read()
+        resp.close()
+        
+
         
 
         
@@ -252,6 +288,7 @@ class Chomik(object):
         header += """Host: box.chomikuj.pl\r\n\r\n"""
         header += xml_content
         resp = self.send(header)
+        #print resp
         resp_dict =  self.soap.soap_xml_to_dict(resp)
         status = resp_dict['s:Envelope']['s:Body']['DownloadResponse']['DownloadResult']['a:status']
         if status != 'Ok':
@@ -267,13 +304,15 @@ class Chomik(object):
             pass
         else:
             files_list = files_dict["FileEntry"]
-            if type(files_list) == type({}):
+            if type(files_list) == type({}) and type(files_list["url"]) != type({}):
                 yield (files_list["name"], files_list["url"])
             elif type(files_list) == type([]):
-                for inner_dict in files_list:
-                    yield (inner_dict["name"], inner_dict["url"])
+                for inner_dict in files_list :
+                    if type(inner_dict["url"]) != type({}):
+                        yield (inner_dict["name"], inner_dict["url"])
     
     def download_file(self, url, filepath):
+        self.view.print_(filepath)
         urllib.urlretrieve(url, filepath)
         
 
@@ -305,7 +344,7 @@ class Chomik(object):
         
 if __name__ == "__main__":
     c = Chomik()
-    c.login()
+    c.login("tmp_chomik1", "")
     for i in c.get_next_folder():
         print i
         print c.get_files_list(i[0])
