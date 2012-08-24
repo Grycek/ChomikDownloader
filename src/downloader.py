@@ -87,8 +87,8 @@ class Downloader(object):
             sys.exit(1)
     
     def download_folder(self, chomik_folder_path, disc_folder_path):
-        #chidir
-        for folder_id, chomik_folder in self.chomik.get_next_folder():
+        folder_dom =  self.chomik.chdirs("/bajery/sezon4/")
+        for folder_id, chomik_folder in self.chomik.get_next_folder(folders_dom=folder_dom):
             folder_path = os.path.join(disc_folder_path, chomik_folder[1:255])
             if not os.path.exists( folder_path ):
                 os.makedirs( folder_path  )

@@ -54,7 +54,7 @@ def print_dict_in_dict(d, root = ""):
 def change_coding(text):
     try:
         if sys.platform.startswith('win'):
-          text = text.decode('cp1250').encode('utf-8')
+            text = text.decode('cp1250').encode('utf-8')
     except Exception, e:
         print e
     return text
@@ -269,6 +269,26 @@ class Chomik(object):
                 for inner_dict in v:
                     for i in self.get_next_folder(inner_dict, root):
                         yield i
+                        
+    def chdirs(self, directories):
+        folders = [i.replace("/","") for i in directories.split('/') if i != '']
+        return self.__access_node(folders, self.folders_dom)
+    
+    def __access_node(self, directories, folders_dom):
+        if len(directories) == 0:
+            return folders_dom
+        folders_dom = folders_dom[u'folders'][u'FolderInfo']
+        #TODO - utf
+        if u"name" in folders_dom and folders_dom[u'name'] == directories[0]:
+            return self.__access_node(directories[1:], folders_dom)
+        if type(folders_dom) == type([]):
+            for inner_dict in folders_dom:
+                if u"name" in inner_dict and inner_dict[u'name'] == directories[0]:
+                    return self.__access_node(directories[1:], inner_dict)
+        return None
+            
+            
+        
 
                         
     def get_files_list(self, folder_id):
@@ -311,9 +331,6 @@ class Chomik(object):
                     if type(inner_dict["url"]) != type({}):
                         yield (inner_dict["name"], inner_dict["url"])
     
-    def download_file(self, url, filepath):
-        self.view.print_(filepath)
-        urllib.urlretrieve(url, filepath)
         
 
     def download_token(self):
