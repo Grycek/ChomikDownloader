@@ -13,15 +13,51 @@ import sys
 import os
 import threading
 import urllib
+import urllib2
+import time
 
-def download_file(view, pool_sema, filepath, url):
-    try:
-        print "Start"
-        view.print_(filepath)
-        urllib.urlretrieve(url, filepath)
-        print "End"
-    finally:
-        pool_sema.release()   
+class ReportHook(object):
+    def __init__(self, rate_refresh, name, view):
+        self.initiatlized = False
+        self.rate_refresh = rate_refresh
+        self.name         = name
+        self.view         = view
+    
+    def update(self, count, block_size, total):
+        if not self.initiatlized:
+            self.initiatlized = True
+            self.pb = view.ProgressBar(total=total, rate_refresh = self.rate_refresh, count = 0, name = self.name)
+            self.view.add_progress_bar(self.pb)
+        else:
+            self.pb.update(block_size)
+            self.view.update_progress_bars()
+    
+    def remove_pb(self):
+        if self.initiatlized:
+            self.view.update_progress_bars()
+            self.view.delete_progress_bar(self.pb)
+            
+            
+
+class DownloaderThread(threading.Thread):
+    def __init__(self, pool_sema, filepath, url, view_):
+        threading.Thread.__init__(self)
+        self.pool_sema = pool_sema
+        self.filepath  = filepath
+        self.view      = view_
+        self.url       = url
+        self.daemon     = True
+    
+    def run(self):
+        pb = ReportHook(0.5, self.filepath, self.view)
+        try:
+            opener = urllib.FancyURLopener({}) 
+            self.view.print_(self.filepath)
+            opener.retrieve(self.url, self.filepath, pb.update )
+        finally:
+            pb.remove_pb()
+            self.pool_sema.release()   
+ 
                 
 class Downloader(object):
     def __init__(self, user = None, password = None, view_ = None, model_ = None, debug = False):
@@ -38,7 +74,7 @@ class Downloader(object):
         self.password         = password
         self.notuploaded_file = 'notdownloaded.txt'
         self.uploaded_file    = 'downloaded.txt'
-        maxthreads        = 4
+        maxthreads            = 10
         self.pool_sema         = threading.BoundedSemaphore(value=maxthreads)
         self.chomik = Chomik(self.view, self.model)
         if self.user == None:
@@ -59,18 +95,11 @@ class Downloader(object):
             for name, url in self.chomik.get_files_list(folder_id):
                 filepath = os.path.join(folder_path, name) 
                 self.pool_sema.acquire()
-                #t = threading.Thread(target = self.__downloader_aux(filepath, url))
-                t = threading.Thread(target = download_file(self.view, self.pool_sema, filepath, url) )
+                t = DownloaderThread(self.pool_sema, filepath, url, self.view)
                 t.daemon = True
                 t.start()
-                    
-    def __downloader_aux(self, filepath, url):
-            try:
-                print "Start"
-                self.chomik.download_file(url, filepath)
-                print "End"
-            finally:
-                self.pool_sema.release()        
+        while threading.active_count() > 1:
+            time.sleep(1.)
                 
                 
 if __name__ == "__main__":
