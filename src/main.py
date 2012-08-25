@@ -31,6 +31,7 @@ if True:
     
     if len(args) != 2:
         usage()
+        sys.exit()
     
     login    = None
     password = None
