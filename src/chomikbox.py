@@ -241,6 +241,7 @@ class Chomik(object):
             self.view.print_( "Blad(pobieranie listy folderow):" )
             self.view.print_( status )        
             return False
+        #print resp_dict['s:Envelope']['s:Body']['FoldersResponse']['FoldersResult']['a:folder']
         self.folders_dom = resp_dict['s:Envelope']['s:Body']['FoldersResponse']['FoldersResult']['a:folder']
         return True
 

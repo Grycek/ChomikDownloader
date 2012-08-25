@@ -40,23 +40,34 @@ class ReportHook(object):
             
 
 class DownloaderThread(threading.Thread):
-    def __init__(self, pool_sema, filepath, url, view_):
+    def __init__(self, pool_sema, filepath, chomik_file_path, url, view_, model_):
         threading.Thread.__init__(self)
-        self.pool_sema = pool_sema
-        self.filepath  = filepath
-        self.view      = view_
-        self.url       = url
+        self.pool_sema  = pool_sema
+        self.filepath   = filepath
+        self.chomik_file_path = chomik_file_path
+        self.view       = view_
+        self.model      = model_
+        self.url        = url
         self.daemon     = True
     
     def run(self):
+        self.model.add_notuploaded_normal(self.chomik_file_path)
+        self.view.print_("Pobieranie:", self.filepath, '\r\n')
         pb = ReportHook(0.5, self.filepath, self.view)
         try:
             opener = urllib.FancyURLopener({}) 
-            self.view.print_(self.filepath)
             opener.retrieve(self.url, self.filepath, pb.update )
+        except Exception, e:
+            self.view.print_("Blad:", e)
+            self.view.print_(self.filepath)
+        else:
+            self.model.remove_notuploaded(self.chomik_file_path)
+            self.model.add_uploaded(self.chomik_file_path)
+            self.view.print_("Pobrano:", self.filepath, '\r\n')
         finally:
             pb.remove_pb()
             self.pool_sema.release()   
+        
  
                 
 class Downloader(object):
@@ -72,9 +83,7 @@ class Downloader(object):
         self.debug            = debug
         self.user             = user
         self.password         = password
-        self.notuploaded_file = 'notdownloaded.txt'
-        self.uploaded_file    = 'downloaded.txt'
-        maxthreads            = 10
+        maxthreads            = 2
         self.pool_sema         = threading.BoundedSemaphore(value=maxthreads)
         self.chomik = Chomik(self.view, self.model)
         if self.user == None:
@@ -87,21 +96,31 @@ class Downloader(object):
             sys.exit(1)
     
     def download_folder(self, chomik_folder_path, disc_folder_path):
-        folder_dom =  self.chomik.chdirs("/bajery/sezon4/")
+        folder_dom =  self.chomik.chdirs(chomik_folder_path)
+        chomik_folder_path = [self.user] + [i for i in chomik_folder_path.split("/") if i != ""]
+        chomik_folder_path = "/" + "/".join(chomik_folder_path[:-1]) + "/"
         for folder_id, chomik_folder in self.chomik.get_next_folder(folders_dom=folder_dom):
-            folder_path = os.path.join(disc_folder_path, chomik_folder[1:255])
+            folder_path      = os.path.join(disc_folder_path, chomik_folder[1:255])
+            chomik_path      = chomik_folder_path + chomik_folder
+            chomik_path      = chomik_path.replace("//","/")
             if not os.path.exists( folder_path ):
                 os.makedirs( folder_path  )
-            for name, url in self.chomik.get_files_list(folder_id):
-                filepath = os.path.join(folder_path, name) 
-                self.pool_sema.acquire()
-                t = DownloaderThread(self.pool_sema, filepath, url, self.view)
-                t.daemon = True
-                t.start()
+            self.__download_files_in_folder(folder_id, folder_path, chomik_path)
         while threading.active_count() > 1:
             time.sleep(1.)
+    
+    def __download_files_in_folder(self, folder_id, folder_path, chomik_path):
+        for name, url in self.chomik.get_files_list(folder_id):
+            filepath         = os.path.join(folder_path, name) 
+            chomik_file_path = os.path.join(chomik_path, name)
+            if self.model.in_uploaded(chomik_file_path):
+                continue
+            self.pool_sema.acquire()
+            t = DownloaderThread(self.pool_sema, filepath, chomik_file_path, url, self.view, self.model)
+            t.start()
+        
                 
                 
 if __name__ == "__main__":
     d = Downloader("tmp_chomik1", "")
-    d.download_folder("", "/tmp")
+    d.download_folder("bajery", "/tmp")

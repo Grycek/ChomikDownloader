@@ -33,8 +33,8 @@ class Model(object):
         self.lock                  = threading.Lock()
         ##synchronizacja zmiany katalogow w chomiku
         self.chdirs_lock           = threading.Lock()
-        self.notuploaded_file_name = 'notuploaded.txt'
-        self.uploaded_file_name    = 'uploaded.txt'
+        self.notuploaded_file_name = 'notdownloaded.txt'
+        self.uploaded_file_name    = 'downloaded.txt'
         self.uploaded              = []
         self.notuploaded           = []
         
