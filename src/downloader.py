@@ -60,18 +60,19 @@ class DownloaderThread(threading.Thread):
         except Exception, e:
             self.view.print_("Blad:", e)
             self.view.print_(self.filepath)
+            pb.remove_pb()
+            self.pool_sema.release()
         else:
             self.model.remove_notuploaded(self.chomik_file_path)
             self.model.add_uploaded(self.chomik_file_path)
-            self.view.print_("Pobrano:", self.filepath, '\r\n')
-        finally:
             pb.remove_pb()
+            self.view.print_("Pobrano:", self.filepath, '\r\n')
             self.pool_sema.release()   
         
  
                 
 class Downloader(object):
-    def __init__(self, user = None, password = None, view_ = None, model_ = None, debug = False):
+    def __init__(self, user = None, password = None, view_ = None, model_ = None, debug = False, threads = 1):
         if view_ == None:
             self.view    = view.View()
         else:
@@ -83,7 +84,7 @@ class Downloader(object):
         self.debug            = debug
         self.user             = user
         self.password         = password
-        maxthreads            = 2
+        maxthreads            = threads
         self.pool_sema         = threading.BoundedSemaphore(value=maxthreads)
         self.chomik = Chomik(self.view, self.model)
         if self.user == None:
@@ -97,6 +98,8 @@ class Downloader(object):
     
     def download_folder(self, chomik_folder_path, disc_folder_path):
         folder_dom =  self.chomik.chdirs(chomik_folder_path)
+        if folder_dom == None:
+            return
         chomik_folder_path = [self.user] + [i for i in chomik_folder_path.split("/") if i != ""]
         chomik_folder_path = "/" + "/".join(chomik_folder_path[:-1]) + "/"
         for folder_id, chomik_folder in self.chomik.get_next_folder(folders_dom=folder_dom):
@@ -122,5 +125,5 @@ class Downloader(object):
                 
                 
 if __name__ == "__main__":
-    d = Downloader("tmp_chomik1", "")
-    d.download_folder("bajery", "/tmp")
+    d = Downloader("", "")
+    d.download_folder("asfhnkjasjhdf", "/tmp")

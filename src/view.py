@@ -1,6 +1,6 @@
 #!/usr/bin/env python 
 # -*- coding: utf-8 -*- 
-# Author: Adam Grycner (adam_gr [at] gazeta.pl)
+# Author: Adam  (adam_gr [at] gazeta.pl)
 #
 # Written: 12/11/2011
 #

@@ -6,7 +6,6 @@
 #
 # Released under: GNU GENERAL PUBLIC LICENSE
 #
-# Ver: 0.5
 
 import socket
 import urllib2
@@ -69,7 +68,13 @@ def to_unicode(text):
         print e
     return text
 
-
+def unescape_name(text):
+    text = text.replace("&quot;", '"')
+    text = text.replace("&apos;", "'")
+    text = text.replace("&lt;", "<")
+    text = text.replace("&gt;", ">")
+    text = text.replace("&amp;", "&")
+    return text
 
 #####################################################################################################
 class ChomikException(Exception):
@@ -273,18 +278,21 @@ class Chomik(object):
                         
     def chdirs(self, directories):
         folders = [i.replace("/","") for i in directories.split('/') if i != '']
-        return self.__access_node(folders, self.folders_dom)
+        result = self.__access_node(folders, self.folders_dom)
+        if result == None:
+            self.view.print_("Bledna sciezka", directories)
+        return result
     
     def __access_node(self, directories, folders_dom):
         if len(directories) == 0:
             return folders_dom
         folders_dom = folders_dom[u'folders'][u'FolderInfo']
         #TODO - utf
-        if u"name" in folders_dom and folders_dom[u'name'] == directories[0]:
+        if u"name" in folders_dom and folders_dom[u'name'] == unescape_name(to_unicode(directories[0])):
             return self.__access_node(directories[1:], folders_dom)
         if type(folders_dom) == type([]):
             for inner_dict in folders_dom:
-                if u"name" in inner_dict and inner_dict[u'name'] == directories[0]:
+                if u"name" in inner_dict and inner_dict[u'name'] == unescape_name(to_unicode(directories[0])):
                     return self.__access_node(directories[1:], inner_dict)
         return None
             
@@ -361,11 +369,4 @@ class Chomik(object):
         
         
 if __name__ == "__main__":
-    c = Chomik()
-    c.login("tmp_chomik1", "")
-    for i in c.get_next_folder():
-        print i
-        print c.get_files_list(i[0])
-    #print c.chomik_id
-    #print c.folders_dom
-    #c.download_token()
+    pass
