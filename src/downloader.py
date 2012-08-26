@@ -126,5 +126,5 @@ class Downloader(object):
                 
                 
 if __name__ == "__main__":
-    d = Downloader("tmp_chomik1", "")
+    d = Downloader("", "")
     d.download_folder("asfhnkjasjhdf", "/tmp")
