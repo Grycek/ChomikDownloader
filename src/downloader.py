@@ -70,6 +70,7 @@ class DownloaderThread(threading.Thread):
             self.pool_sema.release()   
         
  
+    
                 
 class Downloader(object):
     def __init__(self, user = None, password = None, view_ = None, model_ = None, debug = False, threads = 1):
@@ -121,9 +122,9 @@ class Downloader(object):
             self.pool_sema.acquire()
             t = DownloaderThread(self.pool_sema, filepath, chomik_file_path, url, self.view, self.model)
             t.start()
-        
+            #t.run()
                 
                 
 if __name__ == "__main__":
-    d = Downloader("", "")
+    d = Downloader("tmp_chomik1", "")
     d.download_folder("asfhnkjasjhdf", "/tmp")
