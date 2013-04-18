@@ -126,5 +126,5 @@ class Downloader(object):
                 
                 
 if __name__ == "__main__":
-    d = Downloader("", "")
-    d.download_folder("asfhnkjasjhdf", "/tmp")
+    d = Downloader()
+    d.download_folder("", "/tmp")

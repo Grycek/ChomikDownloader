@@ -20,9 +20,9 @@ def usage():
     print 'python', sys.argv[0], '-t 5 -r "/katalog1/katalog2/katalog3" "/home/nick/Dokumenty"'
 
     
-if True:
+def start():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hl:p:t:', ['help','login', 'password','threads'])
+        opts, args = getopt.getopt(sys.argv[1:], 'hl:p:t:d', ['help','login', 'password','threads', 'debug'])
     except Exception, e:
         print 'Przekazano niepoprawny parametr'
         print e
@@ -52,3 +52,5 @@ if True:
     d = downloader.Downloader(login, password,  debug = debug, threads = threads)
     d.download_folder(args[0], args[1])
 
+if __name__ == '__main__':
+    start()

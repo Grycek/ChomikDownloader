@@ -102,7 +102,7 @@ class ChomikException(Exception):
 #####################################################################################################
 #TODO: zmienic cos z kodowaniem
 class Chomik(object):
-    def __init__(self, view_ = None, model_ = None):
+    def __init__(self, view_ = None, model_ = None, debug = False):
         if view_ == None:
             self.view    = view.View()
         else:
@@ -111,6 +111,7 @@ class Chomik(object):
             self.model   = model.Model()
         else:
             self.model   = model_
+        self.debug         = debug
         self.soap          = SOAP()
         ########
         #root folder
@@ -203,7 +204,7 @@ class Chomik(object):
         resp = opener.open("http://www.chomikuj.pl")
         cont = resp.read()
         resp.close()
-        req_token = re.findall("""<form action="/action/Login/TopBarLogin" method="post"><input name="__RequestVerificationToken".*?value="([^"]*)" />""", cont)[0]
+        req_token = re.findall("""input name="__RequestVerificationToken".*?value="([^"]*)" """, cont)[0]
         #################
         values = { "ReturnUrl" : "", "Login": self.user, "rememberLogin" : "true" , "Password" : self.password , "__RequestVerificationToken" : req_token }
         data = urllib.urlencode(values)

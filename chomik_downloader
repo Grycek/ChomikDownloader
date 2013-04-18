@@ -4,6 +4,8 @@
 
 try:
     import chomikdownloader.main
+    chomikdownloader.main.start()
     #raise ImportError
 except ImportError, e:
     import src.main
+    src.main.start()
