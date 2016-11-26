@@ -135,13 +135,20 @@ class Chomik(object):
         sock.connect( (login_ip, login_port) )
         sock.send(content)
         resp = ""
+        kRespSize = 2056
         while True:
-            tmp = sock.recv(640) 
-            if tmp ==  '':
-                break
+            tmp = sock.recv(kRespSize)
             resp   += tmp
+            if tmp ==  '' or tmp.endswith("\r\n\r\n"):
+                break
         sock.close()
-        return resp.partition("\r\n\r\n")[2]
+        resp = resp.partition("\r\n\r\n")[2]
+        resp = re.sub("\r\n\w{1,10}\r\n", "", resp)
+        _, _, resp = resp.partition("<")
+        resp = "<" + resp
+        resp,_,_ = resp.rpartition(">")
+        resp = resp + ">"
+        return resp
                 
         
     def login(self, user, password):
@@ -162,7 +169,7 @@ class Chomik(object):
             return True
         self.last_login = time.time()
         password = hashlib.md5(self.password).hexdigest()
-        xml_dict = [('ROOT',[('name' , self.user), ('passHash', password), ('ver' , '4'), ('client',[('name','chomikbox'),('version','2.0.4.3') ]) ])]
+        xml_dict = [('ROOT',[('name' , self.user), ('passHash', password), ('ver' , '4'), ('client',[('name','chomikbox'),('version','2.0.8.1') ]) ])]
         xml_content = self.soap.soap_dict_to_xml(xml_dict, "Auth").strip()
         xml_len = len(xml_content)
         header  = """POST /services/ChomikBoxService.svc HTTP/1.1\r\n"""
