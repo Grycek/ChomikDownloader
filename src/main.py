@@ -17,7 +17,7 @@ def usage():
     print '-p,--password\t\t haslo do chomika. Przyklad:',
     print 'python', sys.argv[0], '-l nazwa_chomika -p haslo "/katalog1/katalog2/katalog3" "/home/nick/Dokumenty/"'
     print '-t, --threads\t\t liczba watkow (ile plikow jest jednoczescnie wysylanych). Przyklad: ',
-    print 'python', sys.argv[0], '-t 5 -r "/katalog1/katalog2/katalog3" "/home/nick/Dokumenty"'
+    print 'python', sys.argv[0], '-t 5 "/katalog1/katalog2/katalog3" "/home/nick/Dokumenty"'
 
     
 def start():

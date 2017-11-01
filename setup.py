@@ -6,7 +6,7 @@ if sys.platform.startswith('win'):
     import py2exe
     
 setup(name='chomikDownloader',
-          version='0.1.1',
+          version='0.1.2',
           author='adam_gr',
           author_email='adam_gr [at] gazeta.pl',
           description='Downloads files from your account chomikuj.pl',

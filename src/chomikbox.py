@@ -32,6 +32,8 @@ glob_timeout = 240
 login_ip   = "box.chomikuj.pl"
 #login_port = 8083
 login_port = 80
+version = "2.0.8.1"
+client = "ChomikBox-" + version
 
 def print_dict_in_dict(d, root = ""):
     if u"name" in d:
@@ -123,6 +125,8 @@ class Chomik(object):
         self.user          = ''
         self.password      = ''
         self.last_login    = 0
+        self.cookie        = ''
+        self.chomikbox_url = ''
 
 
     def send(self, content, l_ip = "box.chomikuj.pl", l_port = 80):
@@ -142,6 +146,8 @@ class Chomik(object):
             if tmp ==  '' or tmp.endswith("\r\n\r\n"):
                 break
         sock.close()
+        if "Set-Cookie: __cfduid=" in resp:
+            self.cookie = re.findall("Set-Cookie: __cfduid=([^;]*)", resp)[0]
         resp = resp.partition("\r\n\r\n")[2]
         resp = re.sub("\r\n\w{1,10}\r\n", "", resp)
         _, _, resp = resp.partition("<")
@@ -169,14 +175,16 @@ class Chomik(object):
             return True
         self.last_login = time.time()
         password = hashlib.md5(self.password).hexdigest()
-        xml_dict = [('ROOT',[('name' , self.user), ('passHash', password), ('ver' , '4'), ('client',[('name','chomikbox'),('version','2.0.8.1') ]) ])]
+        xml_dict = [('ROOT',[('name' , self.user), ('passHash', password), ('ver' , '4'), ('client',[('name','chomikbox'),('version',version) ]) ])]
         xml_content = self.soap.soap_dict_to_xml(xml_dict, "Auth").strip()
         xml_len = len(xml_content)
         header  = """POST /services/ChomikBoxService.svc HTTP/1.1\r\n"""
         header += """SOAPAction: http://chomikuj.pl/IChomikBoxService/Auth\r\n"""
+        #header += """Content-Encoding: identity\r\n"""
         header += """Content-Type: text/xml;charset=utf-8\r\n"""
         header += """Content-Length: %d\r\n""" % xml_len
         header += """Connection: Keep-Alive\r\n"""
+        header += """Accept-Encoding: identity\r\n"""
         header += """Accept-Language: pl-PL,en,*\r\n"""
         header += """User-Agent: Mozilla/5.0\r\n"""
         header += """Host: box.chomikuj.pl\r\n\r\n"""
@@ -193,6 +201,8 @@ class Chomik(object):
             ses_id    = resp_dict['s:Envelope']['s:Body']['AuthResponse']['AuthResult']['a:token'] 
             self.ses_id    = ses_id
             self.chomik_id = chomik_id
+            if self.ses_id == "-1" or self.chomik_id == "-1":
+                return False
         except IndexError, e:
             self.view.print_( "Blad(relogin):" )
             self.view.print_( e )
@@ -220,16 +230,15 @@ class Chomik(object):
         resp.close()
         #print cont
         ########
-        values = { "chomikId" : self.chomik_id, "folderId": 0, "__RequestVerificationToken" : req_token }
+        #values = { "chomikId" : self.chomik_id, "folderId": 0, "__RequestVerificationToken" : req_token }
+        values = { "chomikName" : self.user, "folderId": 0, "__RequestVerificationToken" : req_token }
         data = urllib.urlencode(values)
         resp = opener.open("http://chomikuj.pl/action/chomikbox/DownloadFolderChomikBox", data)
         cont = resp.read()
         resp.close()
-        
+        self.chomikbox_url = re.findall("""chomik://files/:(\d*)/""", cont)[0]
 
-        
 
-        
     def get_dir_list(self):
         """
         Pobiera liste folderow chomika.
@@ -241,6 +250,8 @@ class Chomik(object):
         header  = """POST /services/ChomikBoxService.svc HTTP/1.1\r\n"""
         header += """SOAPAction: http://chomikuj.pl/IChomikBoxService/Folders\r\n"""
         header += """Content-Type: text/xml;charset=utf-8\r\n"""
+        if self.cookie != '':
+            header += """Cookie: __cfduid={0}\r\n""".format(self.cookie)
         header += """Content-Length: %d\r\n""" % xml_len
         header += """Connection: Keep-Alive\r\n"""
         header += """Accept-Language: pl-PL,en,*\r\n"""
@@ -254,7 +265,6 @@ class Chomik(object):
             self.view.print_( "Blad(pobieranie listy folderow):" )
             self.view.print_( status )        
             return False
-        #print resp_dict['s:Envelope']['s:Body']['FoldersResponse']['FoldersResult']['a:folder']
         self.folders_dom = resp_dict['s:Envelope']['s:Body']['FoldersResponse']['FoldersResult']['a:folder']
         return True
 
@@ -311,21 +321,26 @@ class Chomik(object):
     def get_files_list(self, folder_id):
         #TODO: nie wiem jaki ma byc stamp
         stamp = 0
-        reqid =  str(self.chomik_id) + "/" + str(folder_id)
+        #reqid =  str(self.chomik_id) + "/" + str(folder_id)
+        reqid =  str(self.chomikbox_url) + "/" + str(folder_id)
+        #reqid?
         xml_dict = [('ROOT', [('token', self.ses_id), ( 'sequence', [('stamp', stamp), ('part', 0), ('count', 1), ]), ('disposition', 'download'), ('list', [('DownloadReqEntry', [('id', reqid), ('agreementInfo', [('AgreementInfo',[('name', 'own')])])] )]) ] ) ]
+        #xml_dict = [('ROOT', [('token', self.ses_id), ( 'sequence', [('stamp', stamp), ('part', 0), ('count', 1), ]), ('disposition', 'download'), ('list', [('DownloadReqEntry', [('id', reqid)] )]) ] ) ]
         xml_content = self.soap.soap_dict_to_xml(xml_dict, "Download").strip()
         xml_len = len(xml_content)
         header  = """POST /services/ChomikBoxService.svc HTTP/1.1\r\n"""
         header += """SOAPAction: http://chomikuj.pl/IChomikBoxService/Download\r\n"""
         header += """Content-Type: text/xml;charset=utf-8\r\n"""
+        if self.cookie != '':
+            header += """Cookie: __cfduid={0}\r\n""".format(self.cookie)
         header += """Content-Length: %d\r\n""" % xml_len
         header += """Connection: Keep-Alive\r\n"""
+        header += """Accept-Encoding: identity\r\n"""
         header += """Accept-Language: pl-PL,en,*\r\n"""
         header += """User-Agent: Mozilla/5.0\r\n"""
         header += """Host: box.chomikuj.pl\r\n\r\n"""
         header += xml_content
         resp = self.send(header)
-        #print resp
         resp_dict =  self.soap.soap_xml_to_dict(resp)
         status = resp_dict['s:Envelope']['s:Body']['DownloadResponse']['DownloadResult']['a:status']
         if status != 'Ok':
@@ -333,7 +348,8 @@ class Chomik(object):
             self.view.print_( status )        
             return False
         file_list = resp_dict['s:Envelope']['s:Body']['DownloadResponse']['DownloadResult']['a:list']['DownloadFolder']['files']
-        return [i for i in self.__get_files_list_aux(file_list)]
+        result = [i for i in self.__get_files_list_aux(file_list)]
+        return result
 
             
     def __get_files_list_aux(self, files_dict):
@@ -347,7 +363,6 @@ class Chomik(object):
                 for inner_dict in files_list :
                     if type(inner_dict["url"]) != type({}):
                         yield (inner_dict["name"], inner_dict["url"])
-    
         
 
     def download_token(self):
@@ -369,9 +384,9 @@ class Chomik(object):
         header += """Host: box.chomikuj.pl\r\n\r\n"""
         header += xml_content
         resp = self.send(header)
-        print resp
+        #print resp
         resp_dict =  self.soap.soap_xml_to_dict(resp)
-        print resp_dict
+        #print resp_dict
 
         
         
