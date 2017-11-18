@@ -127,6 +127,7 @@ class Chomik(object):
         self.last_login    = 0
         self.cookie        = ''
         self.chomikbox_url = ''
+        self.opener        = None
 
 
     def send(self, content, l_ip = "box.chomikuj.pl", l_port = 80):
@@ -171,7 +172,7 @@ class Chomik(object):
             return False
 
     def relogin(self):
-        if self.last_login + 300 > time.time():
+        if self.last_login + 360 > time.time():
             return True
         self.last_login = time.time()
         password = hashlib.md5(self.password).hexdigest()
@@ -206,34 +207,35 @@ class Chomik(object):
         except IndexError, e:
             self.view.print_( "Blad(relogin):" )
             self.view.print_( e )
-            #self.view.print_( resp )
+            self.view.print_( resp )
             return False
         else:
+            #self.get_dir_list()
+            self.check_events()
             self.log_www()
             return True
     
     def log_www(self):
-        cj = CookieJar()
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-        opener.addheaders.append(('User-Agent','Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)'))
-        opener.addheaders.append(('X-Requested-With', 'XMLHttpRequest'))
-        opener.addheaders.append(('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8'))
-        resp = opener.open("http://www.chomikuj.pl")
+        if self.opener == None:
+            cj = CookieJar()
+            self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+        self.opener.addheaders.append(('User-Agent','Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)'))
+        self.opener.addheaders.append(('X-Requested-With', 'XMLHttpRequest'))
+        self.opener.addheaders.append(('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8'))
+        resp = self.opener.open("http://chomikuj.pl/chomik/chomikbox/LoginFromBox?t=" + self.ses_id + "&returnUrl=/ChomikBox")
         cont = resp.read()
         resp.close()
         req_token = re.findall("""input name="__RequestVerificationToken".*?value="([^"]*)" """, cont)[0]
         #################
         values = { "ReturnUrl" : "", "Login": self.user, "rememberLogin" : "true" , "Password" : self.password , "__RequestVerificationToken" : req_token }
         data = urllib.urlencode(values)
-        resp = opener.open("http://chomikuj.pl/action/Login/TopBarLogin", data)
+        resp = self.opener.open("http://chomikuj.pl/action/Login/TopBarLogin", data)
         cont = resp.read()
         resp.close()
-        #print cont
         ########
-        #values = { "chomikId" : self.chomik_id, "folderId": 0, "__RequestVerificationToken" : req_token }
         values = { "chomikName" : self.user, "folderId": 0, "__RequestVerificationToken" : req_token }
         data = urllib.urlencode(values)
-        resp = opener.open("http://chomikuj.pl/action/chomikbox/DownloadFolderChomikBox", data)
+        resp = self.opener.open("http://chomikuj.pl/action/chomikbox/DownloadFolderChomikBox", data)
         cont = resp.read()
         resp.close()
         self.chomikbox_url = re.findall("""chomik://files/:(\d*)/""", cont)[0]
@@ -266,6 +268,35 @@ class Chomik(object):
             self.view.print_( status )        
             return False
         self.folders_dom = resp_dict['s:Envelope']['s:Body']['FoldersResponse']['FoldersResult']['a:folder']
+        return True
+
+
+    def check_events(self):
+        """
+        Sprawdza ostatni stan aplikacji chomikbox
+        """
+        self.relogin()
+        xml_dict = [('ROOT',[('token' , self.ses_id), ('stats', [("isUploading", '0'), ("isDownloading", '0'),  ("panelSelectedTab", '0'), ("animation", '2') ]) ])]
+        xml_content = self.soap.soap_dict_to_xml(xml_dict, "CheckEvents").strip()
+        xml_len = len(xml_content)
+        header  = """POST /services/ChomikBoxService.svc HTTP/1.1\r\n"""
+        header += """SOAPAction: http://chomikuj.pl/IChomikBoxService/CheckEvents\r\n"""
+        header += """Content-Type: text/xml;charset=utf-8\r\n"""
+        if self.cookie != '':
+            header += """Cookie: __cfduid={0}\r\n""".format(self.cookie)
+        header += """Content-Length: %d\r\n""" % xml_len
+        header += """Connection: Keep-Alive\r\n"""
+        header += """Accept-Language: pl-PL,en,*\r\n"""
+        header += """User-Agent: Mozilla/5.0\r\n"""
+        header += """Host: box.chomikuj.pl\r\n\r\n"""
+        header += xml_content
+        resp = self.send(header)
+        resp_dict =  self.soap.soap_xml_to_dict(resp)
+        status = resp_dict['s:Envelope']['s:Body']['CheckEventsResponse']['CheckEventsResult']['status']['#text']
+        if status != 'Ok':
+            self.view.print_( "Blad(sprawdzanie stanu chomikboxa):" )
+            self.view.print_( status )
+            return False
         return True
 
 
